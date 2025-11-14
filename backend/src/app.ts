@@ -20,6 +20,8 @@ import { assetRoutes } from './routes/assets.routes';
 import { arcoRoutes } from './routes/arco.routes';
 import { searchRoutes } from './routes/search.routes';
 import { collectionRoutes } from './routes/collections.routes';
+import { auditRoutes } from './routes/audit.routes';
+import { auditMiddleware } from './middleware/audit.middleware';
 
 export const createApp = (): Application => {
   const app = express();
@@ -172,12 +174,16 @@ export const createApp = (): Application => {
   // API ROUTES
   // ============================================================================
 
+  // Audit middleware - logs all state-changing operations
+  app.use(config.apiPrefix, auditMiddleware);
+
   // API Routes
   app.use(`${config.apiPrefix}/auth`, authRoutes);
   app.use(`${config.apiPrefix}/assets`, assetRoutes);
   app.use(`${config.apiPrefix}/arco`, arcoRoutes);
   app.use(`${config.apiPrefix}/search`, searchRoutes);
   app.use(`${config.apiPrefix}/collections`, collectionRoutes);
+  app.use(`${config.apiPrefix}/audit`, auditRoutes);
 
   // Placeholder route
   app.get(config.apiPrefix, (req, res) => {

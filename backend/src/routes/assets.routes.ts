@@ -130,6 +130,45 @@ router.get('/stats', authenticate, authorize('ADMIN', 'CURATOR'), assetControlle
 
 /**
  * @swagger
+ * /assets/bulk-download:
+ *   post:
+ *     summary: Download multiple assets as ZIP archive
+ *     tags: [Assets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - assetIds
+ *             properties:
+ *               assetIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 description: Array of asset IDs to download
+ *                 maxItems: 100
+ *               includeMetadata:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Include metadata.json file in ZIP
+ *     responses:
+ *       200:
+ *         description: ZIP file download
+ *         content:
+ *           application/zip:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       400:
+ *         description: Invalid request
+ */
+router.post('/bulk-download', assetController.bulkDownload);
+
+/**
+ * @swagger
  * /assets/{id}:
  *   get:
  *     summary: Get asset by ID

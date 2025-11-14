@@ -3,6 +3,7 @@
 
 import { Response, NextFunction } from 'express';
 import { CollectionService, CreateCollectionDto, UpdateCollectionDto } from '../services/collection.service';
+import { BulkDownloadService } from '../services/bulk-download.service';
 import { CollectionFilters } from '../repositories/collection.repository';
 import { AuthenticatedRequest } from '../types';
 import { getPrismaClient } from '../config/database';
@@ -11,9 +12,11 @@ import { logger } from '../utils/logger';
 
 export class CollectionController {
   private collectionService: CollectionService;
+  private bulkDownloadService: BulkDownloadService;
 
   constructor() {
     this.collectionService = new CollectionService(getPrismaClient());
+    this.bulkDownloadService = new BulkDownloadService();
   }
 
   /**
@@ -378,6 +381,36 @@ export class CollectionController {
         success: true,
         data: collections,
       });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * GET /collections/:id/download
+   * Download collection assets as ZIP
+   */
+  downloadCollection = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+
+      const result = await this.bulkDownloadService.createCollectionDownload(
+        id,
+        req.user?.id
+      );
+
+      // Set response headers for file download
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+
+      // Stream the ZIP to response
+      result.stream.pipe(res);
+
+      logger.info(`Collection download: ${id} by ${req.user?.email || 'anonymous'}`);
     } catch (error) {
       next(error);
     }

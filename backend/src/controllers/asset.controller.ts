@@ -3,6 +3,7 @@
 
 import { Response, NextFunction } from 'express';
 import { AssetService } from '../services/asset.service';
+import { BulkDownloadService } from '../services/bulk-download.service';
 import { CreateAssetDto, UpdateAssetDto, AssetSearchDto, AddTagsDto } from '../dto/asset.dto';
 import { AuthenticatedRequest } from '../types';
 import { getPrismaClient } from '../config/database';
@@ -11,9 +12,11 @@ import { logger } from '../utils/logger';
 
 export class AssetController {
   private assetService: AssetService;
+  private bulkDownloadService: BulkDownloadService;
 
   constructor() {
     this.assetService = new AssetService(getPrismaClient());
+    this.bulkDownloadService = new BulkDownloadService();
   }
 
   /**
@@ -356,6 +359,41 @@ export class AssetController {
         success: true,
         data: stats,
       });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /assets/bulk-download
+   * Bulk download multiple assets as ZIP
+   */
+  bulkDownload = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { assetIds, includeMetadata } = req.body;
+
+      if (!assetIds || !Array.isArray(assetIds)) {
+        throw new BadRequestError('assetIds must be an array');
+      }
+
+      const result = await this.bulkDownloadService.createBulkDownload({
+        assetIds,
+        includeMetadata: includeMetadata === true,
+        userId: req.user?.id,
+      });
+
+      // Set response headers for file download
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+
+      // Stream the ZIP to response
+      result.stream.pipe(res);
+
+      logger.info(`Bulk download: ${assetIds.length} assets by ${req.user?.email || 'anonymous'}`);
     } catch (error) {
       next(error);
     }

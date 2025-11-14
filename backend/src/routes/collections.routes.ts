@@ -341,4 +341,32 @@ router.post('/:id/share', authenticate, collectionController.share);
  */
 router.post('/:id/unshare', authenticate, collectionController.unshare);
 
+/**
+ * @swagger
+ * /collections/{id}/download:
+ *   get:
+ *     summary: Download collection as ZIP archive
+ *     tags: [Collections]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: ZIP file download with all collection assets
+ *         content:
+ *           application/zip:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Collection not found
+ *       403:
+ *         description: Access denied
+ */
+router.get('/:id/download', collectionController.downloadCollection);
+
 export { router as collectionRoutes };
