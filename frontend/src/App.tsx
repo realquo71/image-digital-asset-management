@@ -19,6 +19,7 @@ import SearchPage from './pages/SearchPage';
 import CollectionsPage from './pages/collections/CollectionsPage';
 import CollectionDetailPage from './pages/collections/CollectionDetailPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
+import HelpPage from './pages/HelpPage';
 
 // Protected route wrapper
 const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) => {
@@ -66,6 +67,9 @@ function App() {
         {/* Collections */}
         <Route path="/collections" element={<CollectionsPage />} />
         <Route path="/collections/:id" element={<CollectionDetailPage />} />
+
+        {/* Help */}
+        <Route path="/help" element={<HelpPage />} />
 
         {/* Admin routes */}
         <Route
