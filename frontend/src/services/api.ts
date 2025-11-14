@@ -289,4 +289,45 @@ export const auditApi = {
   }) => api.get('/audit/export', { params, responseType: 'blob' }),
 };
 
+// Export API
+export const exportApi = {
+  // Get available export formats
+  getFormats: () => api.get<{ id: string; name: string; description: string; mimeType: string; fileExtension: string }[]>('/export/formats'),
+
+  // Export single asset to ICCD XML
+  exportAssetICCD: (assetId: string, includeArcoTags = true, includeTags = true) =>
+    api.get(`/export/iccd/${assetId}`, {
+      params: { includeArcoTags, includeTags },
+      responseType: 'blob',
+    }),
+
+  // Export multiple assets to ICCD XML
+  exportAssetsICCD: (assetIds: string[], includeArcoTags = true, includeTags = true) =>
+    api.post('/export/iccd', { assetIds, includeArcoTags, includeTags }, { responseType: 'blob' }),
+
+  // Export single asset to JSON-LD
+  exportAssetJSONLD: (assetId: string, includeArcoTags = true, includeTags = true) =>
+    api.get(`/export/jsonld/${assetId}`, {
+      params: { includeArcoTags, includeTags },
+    }),
+
+  // Export multiple assets to JSON-LD
+  exportAssetsJSONLD: (assetIds: string[], includeArcoTags = true, includeTags = true) =>
+    api.post('/export/jsonld', { assetIds, includeArcoTags, includeTags }),
+
+  // Export single asset to Turtle RDF
+  exportAssetTurtle: (assetId: string, includeArcoTags = true, includeTags = true) =>
+    api.get(`/export/turtle/${assetId}`, {
+      params: { includeArcoTags, includeTags },
+      responseType: 'blob',
+    }),
+
+  // Export single asset to N-Triples
+  exportAssetNTriples: (assetId: string, includeArcoTags = true, includeTags = true) =>
+    api.get(`/export/ntriples/${assetId}`, {
+      params: { includeArcoTags, includeTags },
+      responseType: 'blob',
+    }),
+};
+
 export default api;
