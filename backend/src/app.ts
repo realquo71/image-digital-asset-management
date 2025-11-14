@@ -16,7 +16,7 @@ import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
 // Import routes
 import { authRoutes } from './routes/auth.routes';
-// import { assetRoutes } from './routes/assets.routes';
+import { assetRoutes } from './routes/assets.routes';
 // import { collectionRoutes } from './routes/collections.routes';
 // import { arcoRoutes } from './routes/arco.routes';
 
@@ -173,8 +173,8 @@ export const createApp = (): Application => {
 
   // API Routes
   app.use(`${config.apiPrefix}/auth`, authRoutes);
+  app.use(`${config.apiPrefix}/assets`, assetRoutes);
   // TODO: Uncomment as routes are implemented
-  // app.use(`${config.apiPrefix}/assets`, assetRoutes);
   // app.use(`${config.apiPrefix}/collections`, collectionRoutes);
   // app.use(`${config.apiPrefix}/arco`, arcoRoutes);
 
