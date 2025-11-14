@@ -348,6 +348,79 @@ export class AssetService {
   }
 
   /**
+   * Add ArCo tags to asset
+   */
+  async addArCoTags(
+    assetId: string,
+    arcoTags: Array<{ uri: string; label: string; category: string; notation?: string }>,
+    userId: string
+  ): Promise<Asset> {
+    const asset = await this.assetRepository.findById(assetId);
+
+    if (!asset) {
+      throw new NotFoundError('Asset', assetId);
+    }
+
+    // Create or update ArCo tags
+    for (const tag of arcoTags) {
+      await this.prisma.arcoTag.upsert({
+        where: { arcoUri: tag.uri },
+        update: {
+          label: tag.label,
+          notation: tag.notation,
+        },
+        create: {
+          arcoUri: tag.uri,
+          label: tag.label,
+          category: tag.category as any, // Cast to ArcoCategory enum
+          notation: tag.notation,
+        },
+      });
+
+      // Link to asset (ignore if already linked)
+      await this.prisma.asset.update({
+        where: { id: assetId },
+        data: {
+          arcoTags: {
+            connect: { arcoUri: tag.uri },
+          },
+        },
+      });
+    }
+
+    logger.info(`ArCo tags added to asset ${assetId}:`, arcoTags.map(t => t.uri));
+
+    // Return updated asset
+    return (await this.assetRepository.findById(assetId))!;
+  }
+
+  /**
+   * Remove ArCo tag from asset
+   */
+  async removeArCoTag(assetId: string, arcoUri: string, userId: string): Promise<Asset> {
+    const asset = await this.assetRepository.findById(assetId);
+
+    if (!asset) {
+      throw new NotFoundError('Asset', assetId);
+    }
+
+    // Disconnect ArCo tag from asset
+    await this.prisma.asset.update({
+      where: { id: assetId },
+      data: {
+        arcoTags: {
+          disconnect: { arcoUri },
+        },
+      },
+    });
+
+    logger.info(`ArCo tag ${arcoUri} removed from asset ${assetId}`);
+
+    // Return updated asset
+    return (await this.assetRepository.findById(assetId))!;
+  }
+
+  /**
    * Get asset statistics
    */
   async getStatistics(): Promise<{

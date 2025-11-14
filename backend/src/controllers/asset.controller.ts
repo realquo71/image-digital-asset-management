@@ -275,6 +275,72 @@ export class AssetController {
   };
 
   /**
+   * POST /assets/:id/arco-tags
+   * Add ArCo tags to asset
+   */
+  addArCoTags = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      const { id } = req.params;
+      const { arcoTags } = req.body;
+
+      if (!arcoTags || !Array.isArray(arcoTags)) {
+        throw new BadRequestError('arcoTags must be an array');
+      }
+
+      const asset = await this.assetService.addArCoTags(id, arcoTags, req.user.id);
+
+      logger.info(`ArCo tags added to asset ${id} by ${req.user.email}`);
+
+      res.json({
+        success: true,
+        data: asset,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * DELETE /assets/:id/arco-tags/:arcoUri
+   * Remove ArCo tag from asset
+   */
+  removeArCoTag = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      const { id, arcoUri } = req.params;
+
+      // Decode the URI since it will be URL-encoded
+      const decodedUri = decodeURIComponent(arcoUri);
+
+      const asset = await this.assetService.removeArCoTag(id, decodedUri, req.user.id);
+
+      logger.info(`ArCo tag ${decodedUri} removed from asset ${id}`);
+
+      res.json({
+        success: true,
+        data: asset,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
    * GET /assets/stats
    * Get asset statistics
    */

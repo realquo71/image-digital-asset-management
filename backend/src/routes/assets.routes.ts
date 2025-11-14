@@ -337,4 +337,96 @@ router.delete(
   assetController.removeTag
 );
 
+/**
+ * @swagger
+ * /assets/{id}/arco-tags:
+ *   post:
+ *     summary: Add ArCo tags to asset
+ *     tags: [Assets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - arcoTags
+ *             properties:
+ *               arcoTags:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - uri
+ *                     - label
+ *                     - category
+ *                   properties:
+ *                     uri:
+ *                       type: string
+ *                       description: ArCo entity URI
+ *                     label:
+ *                       type: string
+ *                       description: Entity label
+ *                     category:
+ *                       type: string
+ *                       description: ArCo category
+ *                     notation:
+ *                       type: string
+ *                       description: Optional notation code
+ *     responses:
+ *       200:
+ *         description: ArCo tags added successfully
+ *       404:
+ *         description: Asset not found
+ */
+router.post(
+  '/:id/arco-tags',
+  authenticate,
+  authorize('ADMIN', 'CURATOR'),
+  assetController.addArCoTags
+);
+
+/**
+ * @swagger
+ * /assets/{id}/arco-tags/{arcoUri}:
+ *   delete:
+ *     summary: Remove ArCo tag from asset
+ *     tags: [Assets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: path
+ *         name: arcoUri
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ArCo URI (URL-encoded)
+ *     responses:
+ *       200:
+ *         description: ArCo tag removed successfully
+ *       404:
+ *         description: Asset not found
+ */
+router.delete(
+  '/:id/arco-tags/:arcoUri',
+  authenticate,
+  authorize('ADMIN', 'CURATOR'),
+  assetController.removeArCoTag
+);
+
 export { router as assetRoutes };
