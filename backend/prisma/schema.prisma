@@ -1,0 +1,276 @@
+// Prisma Schema for Cultural Heritage DAM
+// Database: PostgreSQL (Azure Database for PostgreSQL recommended)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER MANAGEMENT
+// ============================================================================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String
+  role          UserRole  @default(VIEWER)
+  azureAdId     String?   @unique @map("azure_ad_id")
+  organization  String?
+  department    String?
+  phone         String?
+  isActive      Boolean   @default(true) @map("is_active")
+  lastLoginAt   DateTime? @map("last_login_at")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  assets        Asset[]
+  collections   Collection[]
+  auditLogs     AuditLog[]
+
+  @@index([email])
+  @@index([azureAdId])
+  @@index([role])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  CURATOR
+  RESEARCHER
+  VIEWER
+}
+
+// ============================================================================
+// ASSET MANAGEMENT
+// ============================================================================
+
+model Asset {
+  id              String      @id @default(uuid())
+  title           String
+  description     String?     @db.Text
+  filename        String
+  mimeType        String      @map("mime_type")
+  fileSize        Int         @map("file_size")
+  sharepointUrl   String      @map("sharepoint_url") @db.Text
+  sharepointId    String      @unique @map("sharepoint_id")
+  thumbnailUrl    String?     @map("thumbnail_url") @db.Text
+  status          AssetStatus @default(DRAFT)
+  publishedAt     DateTime?   @map("published_at")
+
+  // EXIF Metadata
+  width           Int?
+  height          Int?
+  captureDate     DateTime?   @map("capture_date")
+  camera          String?
+  lens            String?
+  focalLength     String?     @map("focal_length")
+  aperture        String?
+  shutterSpeed    String?     @map("shutter_speed")
+  iso             String?
+  gpsLatitude     Float?      @map("gps_latitude")
+  gpsLongitude    Float?      @map("gps_longitude")
+
+  // Relations
+  creatorId       String      @map("creator_id")
+  creator         User        @relation(fields: [creatorId], references: [id])
+
+  tags            AssetTag[]
+  arcoTags        ArcoTag[]
+  collections     CollectionAsset[]
+
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  @@index([creatorId])
+  @@index([status])
+  @@index([publishedAt])
+  @@index([createdAt])
+  @@index([mimeType])
+  @@map("assets")
+}
+
+enum AssetStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// ============================================================================
+// TAGGING SYSTEM
+// ============================================================================
+
+model Tag {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  assets    AssetTag[]
+
+  @@index([name])
+  @@map("tags")
+}
+
+model AssetTag {
+  assetId   String   @map("asset_id")
+  tagId     String   @map("tag_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([assetId, tagId])
+  @@index([assetId])
+  @@index([tagId])
+  @@map("asset_tags")
+}
+
+// ============================================================================
+// ARCO INTEGRATION
+// ============================================================================
+
+model ArcoTag {
+  id         String           @id @default(uuid())
+  assetId    String           @map("asset_id")
+  category   ArcoCat
+  arcoUri    String           @map("arco_uri") @db.Text
+  label      String
+  notation   String?
+  confidence Float            @default(1.0)
+  source     ArcoTagSource    @default(MANUAL)
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  asset      Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, arcoUri])
+  @@index([assetId])
+  @@index([category])
+  @@index([arcoUri])
+  @@map("arco_tags")
+}
+
+enum ArcoCat {
+  CULTURAL_PROPERTY_TYPE
+  MATERIAL
+  TECHNIQUE
+  SUBJECT
+  AUTHOR
+  CHRONOLOGY
+  LOCATION
+  CONSERVATION_STATUS
+}
+
+enum ArcoTagSource {
+  MANUAL
+  AI
+}
+
+model ArcoVocabularyCache {
+  id         String   @id @default(uuid())
+  uri        String   @unique @db.Text
+  category   ArcoCat
+  label      String
+  definition String?  @db.Text
+  notation   String?
+  broader    String[] @default([])
+  narrower   String[] @default([])
+  related    String[] @default([])
+  altLabels  String[] @default([]) @map("alt_labels")
+  usageCount Int      @default(0) @map("usage_count")
+  lastSync   DateTime @default(now()) @map("last_sync")
+
+  @@index([category])
+  @@index([label])
+  @@index([uri])
+  @@map("arco_vocabulary_cache")
+}
+
+// ============================================================================
+// COLLECTIONS
+// ============================================================================
+
+model Collection {
+  id            String            @id @default(uuid())
+  name          String
+  description   String?           @db.Text
+  isPublic      Boolean           @default(false) @map("is_public")
+  coverAssetId  String?           @map("cover_asset_id")
+  color         String            @default("#3B82F6")
+  creatorId     String            @map("creator_id")
+
+  creator       User              @relation(fields: [creatorId], references: [id])
+  assets        CollectionAsset[]
+
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  @@index([creatorId])
+  @@index([isPublic])
+  @@index([createdAt])
+  @@map("collections")
+}
+
+model CollectionAsset {
+  collectionId String     @map("collection_id")
+  assetId      String     @map("asset_id")
+  orderIndex   Int        @default(0) @map("order_index")
+  addedAt      DateTime   @default(now()) @map("added_at")
+
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  asset        Asset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, assetId])
+  @@index([collectionId])
+  @@index([assetId])
+  @@index([orderIndex])
+  @@map("collection_assets")
+}
+
+// ============================================================================
+// AUDIT TRAIL
+// ============================================================================
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  userId     String?     @map("user_id")
+  action     AuditAction
+  entityType String      @map("entity_type")
+  entityId   String?     @map("entity_id")
+  details    Json?
+  changes    Json?
+  ipAddress  String?     @map("ip_address")
+  userAgent  String?     @map("user_agent") @db.Text
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  user       User?       @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+enum AuditAction {
+  ASSET_CREATE
+  ASSET_UPDATE
+  ASSET_DELETE
+  ASSET_DOWNLOAD
+  COLLECTION_CREATE
+  COLLECTION_UPDATE
+  COLLECTION_DELETE
+  TAG_ADD
+  TAG_REMOVE
+  ARCO_TAG_ADD
+  ARCO_TAG_REMOVE
+  USER_LOGIN
+  USER_LOGOUT
+  GDPR_DATA_EXPORT
+  GDPR_DATA_DELETION
+}
