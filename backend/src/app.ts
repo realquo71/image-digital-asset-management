@@ -18,7 +18,8 @@ import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { authRoutes } from './routes/auth.routes';
 import { assetRoutes } from './routes/assets.routes';
 import { arcoRoutes } from './routes/arco.routes';
-// import { collectionRoutes } from './routes/collections.routes';
+import { searchRoutes } from './routes/search.routes';
+import { collectionRoutes } from './routes/collections.routes';
 
 export const createApp = (): Application => {
   const app = express();
@@ -175,8 +176,8 @@ export const createApp = (): Application => {
   app.use(`${config.apiPrefix}/auth`, authRoutes);
   app.use(`${config.apiPrefix}/assets`, assetRoutes);
   app.use(`${config.apiPrefix}/arco`, arcoRoutes);
-  // TODO: Uncomment as routes are implemented
-  // app.use(`${config.apiPrefix}/collections`, collectionRoutes);
+  app.use(`${config.apiPrefix}/search`, searchRoutes);
+  app.use(`${config.apiPrefix}/collections`, collectionRoutes);
 
   // Placeholder route
   app.get(config.apiPrefix, (req, res) => {
