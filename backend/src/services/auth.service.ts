@@ -23,7 +23,7 @@ export class AuthService {
       },
       system: {
         loggerOptions: {
-          loggerCallback: (level, message, containsPii) => {
+          loggerCallback: (_level, message, containsPii) => {
             if (!containsPii) {
               logger.debug(`MSAL: ${message}`);
             }
@@ -38,13 +38,13 @@ export class AuthService {
   /**
    * Get Azure AD authorization URL
    */
-  getAuthorizationUrl(redirectUri: string): string {
+  async getAuthorizationUrl(redirectUri: string): Promise<string> {
     const authCodeUrlParameters = {
       scopes: ['user.read'],
       redirectUri: redirectUri,
     };
 
-    return this.msalClient.getAuthCodeUrl(authCodeUrlParameters);
+    return await this.msalClient.getAuthCodeUrl(authCodeUrlParameters);
   }
 
   /**
@@ -211,7 +211,7 @@ export class AuthService {
       expiresIn: config.jwt.expiresIn,
       issuer: 'dam-backend',
       audience: 'dam-frontend',
-    });
+    } as jwt.SignOptions);
   }
 
   /**
@@ -229,7 +229,7 @@ export class AuthService {
       expiresIn: config.jwt.refreshExpiresIn,
       issuer: 'dam-backend',
       audience: 'dam-frontend',
-    });
+    } as jwt.SignOptions);
   }
 
   /**
@@ -253,10 +253,13 @@ export class AuthService {
         email: true,
         name: true,
         role: true,
+        azureAdId: true,
         organization: true,
         department: true,
+        phone: true,
         isActive: true,
         createdAt: true,
+        updatedAt: true,
         lastLoginAt: true,
       },
     });

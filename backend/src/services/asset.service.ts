@@ -133,7 +133,7 @@ export class AssetService {
    */
   async listAssets(
     filters: AssetFilters,
-    userId?: string,
+    _userId?: string,
     userRole?: string
   ): Promise<{ items: Asset[]; meta: PaginationMeta }> {
     // VIEWER can only see PUBLISHED assets
@@ -284,7 +284,7 @@ export class AssetService {
   /**
    * Add tags to asset
    */
-  async addTags(assetId: string, tagNames: string[], userId: string): Promise<Asset> {
+  async addTags(assetId: string, tagNames: string[], _userId: string): Promise<Asset> {
     const asset = await this.assetRepository.findById(assetId);
 
     if (!asset) {
@@ -324,7 +324,7 @@ export class AssetService {
   /**
    * Remove tag from asset
    */
-  async removeTag(assetId: string, tagId: string, userId: string): Promise<Asset> {
+  async removeTag(assetId: string, tagId: string, _userId: string): Promise<Asset> {
     const asset = await this.assetRepository.findById(assetId);
 
     if (!asset) {
@@ -353,7 +353,7 @@ export class AssetService {
   async addArCoTags(
     assetId: string,
     arcoTags: Array<{ uri: string; label: string; category: string; notation?: string }>,
-    userId: string
+    _userId: string
   ): Promise<Asset> {
     const asset = await this.assetRepository.findById(assetId);
 
@@ -361,29 +361,25 @@ export class AssetService {
       throw new NotFoundError('Asset', assetId);
     }
 
-    // Create or update ArCo tags
+    // Create ArCo tags directly with asset relationship
     for (const tag of arcoTags) {
       await this.prisma.arcoTag.upsert({
-        where: { arcoUri: tag.uri },
+        where: {
+          assetId_arcoUri: {
+            assetId,
+            arcoUri: tag.uri,
+          },
+        },
         update: {
           label: tag.label,
           notation: tag.notation,
         },
         create: {
+          assetId,
           arcoUri: tag.uri,
           label: tag.label,
           category: tag.category as any, // Cast to ArcoCategory enum
           notation: tag.notation,
-        },
-      });
-
-      // Link to asset (ignore if already linked)
-      await this.prisma.asset.update({
-        where: { id: assetId },
-        data: {
-          arcoTags: {
-            connect: { arcoUri: tag.uri },
-          },
         },
       });
     }
@@ -397,19 +393,19 @@ export class AssetService {
   /**
    * Remove ArCo tag from asset
    */
-  async removeArCoTag(assetId: string, arcoUri: string, userId: string): Promise<Asset> {
+  async removeArCoTag(assetId: string, arcoUri: string, _userId: string): Promise<Asset> {
     const asset = await this.assetRepository.findById(assetId);
 
     if (!asset) {
       throw new NotFoundError('Asset', assetId);
     }
 
-    // Disconnect ArCo tag from asset
-    await this.prisma.asset.update({
-      where: { id: assetId },
-      data: {
-        arcoTags: {
-          disconnect: { arcoUri },
+    // Delete ArCo tag using compound unique key
+    await this.prisma.arcoTag.delete({
+      where: {
+        assetId_arcoUri: {
+          assetId,
+          arcoUri,
         },
       },
     });
@@ -497,7 +493,7 @@ export class AssetService {
    * Extract file ID from SharePoint URL
    * This is a placeholder - actual implementation depends on SharePoint URL structure
    */
-  private extractFileIdFromUrl(url: string): string | null {
+  private extractFileIdFromUrl(_url: string): string | null {
     // SharePoint URLs can vary - this needs to be implemented based on actual URL structure
     // For now, return null and handle gracefully
     return null;

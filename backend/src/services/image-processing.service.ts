@@ -40,7 +40,7 @@ export class ImageProcessingService {
   /**
    * Parse EXIF buffer to extract relevant fields
    */
-  private parseExifBuffer(exifBuffer: Buffer): Record<string, any> {
+  private parseExifBuffer(_exifBuffer: Buffer): Record<string, any> {
     try {
       // Sharp provides EXIF data as a buffer
       // We'll extract common fields manually or use a library

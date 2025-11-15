@@ -16,7 +16,7 @@ const upload = multer({
   limits: {
     fileSize: config.upload.maxFileSize,
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     if (config.upload.allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {

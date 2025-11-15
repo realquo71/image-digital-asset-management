@@ -1,7 +1,7 @@
 // Audit Middleware
 // Automatically logs important HTTP operations for compliance
 
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { AuditService } from '../services/audit.service';
 import { AuthenticatedRequest } from '../types';
 import { getPrismaClient } from '../config/database';
@@ -13,20 +13,24 @@ const auditService = new AuditService(getPrismaClient());
  * Audit middleware - logs state-changing operations
  * Only logs POST, PUT, PATCH, DELETE operations
  */
-export const auditMiddleware = async (
-  req: AuthenticatedRequest,
+export const auditMiddleware: RequestHandler = (
+  req: Request,
   res: Response,
   next: NextFunction
-): Promise<void> => {
+): void => {
+  const authenticatedReq = req as AuthenticatedRequest;
+
   // Only audit state-changing operations
-  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-    return next();
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(authenticatedReq.method)) {
+    next();
+    return;
   }
 
   // Skip audit for certain paths (like health checks)
   const skipPaths = ['/api/v1/health', '/api/v1/auth/refresh'];
-  if (skipPaths.some(path => req.path.startsWith(path))) {
-    return next();
+  if (skipPaths.some(path => authenticatedReq.path.startsWith(path))) {
+    next();
+    return;
   }
 
   // Capture original res.json to intercept response
@@ -41,7 +45,7 @@ export const auditMiddleware = async (
     const success = res.statusCode >= 200 && res.statusCode < 400;
 
     // Extract entity information from request
-    const { entityType, entityId, action } = extractEntityInfo(req);
+    const { entityType, entityId, action } = extractEntityInfo(authenticatedReq);
 
     // Create audit log (async, don't block response)
     auditService
@@ -49,15 +53,15 @@ export const auditMiddleware = async (
         action,
         entityType,
         entityId,
-        userId: req.user?.id,
-        ipAddress: getClientIp(req),
-        userAgent: req.headers['user-agent'],
+        userId: authenticatedReq.user?.id,
+        ipAddress: getClientIp(authenticatedReq),
+        userAgent: authenticatedReq.headers['user-agent'],
         details: {
-          method: req.method,
-          path: req.path,
+          method: authenticatedReq.method,
+          path: authenticatedReq.path,
           statusCode: res.statusCode,
           responseTime,
-          requestBody: sanitizeBody(req.body),
+          requestBody: sanitizeBody(authenticatedReq.body),
         },
         success,
         errorMessage: success ? undefined : body?.error?.message,

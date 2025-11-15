@@ -1,7 +1,7 @@
 // Asset Controller
 // Handles asset-related HTTP requests
 
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { AssetService } from '../services/asset.service';
 import { BulkDownloadService } from '../services/bulk-download.service';
 import { CreateAssetDto, UpdateAssetDto, AssetSearchDto, AddTagsDto } from '../dto/asset.dto';
@@ -24,29 +24,31 @@ export class AssetController {
    * Upload new asset
    */
   upload = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      if (!req.user) {
+      const authReq = req as AuthenticatedRequest;
+
+      if (!authReq.user) {
         throw new UnauthorizedError('User not authenticated');
       }
 
-      if (!req.file) {
+      if (!authReq.file) {
         throw new BadRequestError('No file uploaded');
       }
 
       // Validate metadata from form fields
       const metadata = CreateAssetDto.validate({
-        title: req.body.title,
-        description: req.body.description,
-        status: req.body.status,
+        title: authReq.body.title,
+        description: authReq.body.description,
+        status: authReq.body.status,
       });
 
-      const asset = await this.assetService.uploadAsset(req.file, metadata, req.user.id);
+      const asset = await this.assetService.uploadAsset(authReq.file, metadata, authReq.user.id);
 
-      logger.info(`Asset uploaded: ${asset.id} by ${req.user.email}`);
+      logger.info(`Asset uploaded: ${asset.id} by ${authReq.user.email}`);
 
       res.status(201).json({
         success: true,
@@ -62,17 +64,18 @@ export class AssetController {
    * List assets with filters
    */
   list = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      const filters = AssetSearchDto.validate(req.query);
+      const authReq = req as AuthenticatedRequest;
+      const filters = AssetSearchDto.validate(authReq.query) as any;
 
       const result = await this.assetService.listAssets(
         filters,
-        req.user?.id,
-        req.user?.role
+        authReq.user?.id,
+        authReq.user?.role
       );
 
       res.json({
@@ -90,14 +93,15 @@ export class AssetController {
    * Get single asset by ID
    */
   getById = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      const { id } = req.params;
+      const authReq = req as AuthenticatedRequest;
+      const { id } = authReq.params;
 
-      const asset = await this.assetService.getAssetById(id, req.user?.id);
+      const asset = await this.assetService.getAssetById(id, authReq.user?.id);
 
       res.json({
         success: true,
@@ -113,26 +117,28 @@ export class AssetController {
    * Update asset metadata
    */
   update = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      if (!req.user) {
+      const authReq = req as AuthenticatedRequest;
+
+      if (!authReq.user) {
         throw new UnauthorizedError('User not authenticated');
       }
 
-      const { id } = req.params;
-      const data = UpdateAssetDto.validate(req.body);
+      const { id } = authReq.params;
+      const data = UpdateAssetDto.validate(authReq.body);
 
       const asset = await this.assetService.updateAsset(
         id,
         data,
-        req.user.id,
-        req.user.role
+        authReq.user.id,
+        authReq.user.role
       );
 
-      logger.info(`Asset updated: ${id} by ${req.user.email}`);
+      logger.info(`Asset updated: ${id} by ${authReq.user.email}`);
 
       res.json({
         success: true,
@@ -148,20 +154,22 @@ export class AssetController {
    * Delete asset
    */
   delete = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      if (!req.user) {
+      const authReq = req as AuthenticatedRequest;
+
+      if (!authReq.user) {
         throw new UnauthorizedError('User not authenticated');
       }
 
-      const { id } = req.params;
+      const { id } = authReq.params;
 
-      await this.assetService.deleteAsset(id, req.user.id, req.user.role);
+      await this.assetService.deleteAsset(id, authReq.user.id, authReq.user.role);
 
-      logger.info(`Asset deleted: ${id} by ${req.user.email}`);
+      logger.info(`Asset deleted: ${id} by ${authReq.user.email}`);
 
       res.json({
         success: true,
@@ -177,12 +185,13 @@ export class AssetController {
    * Download original asset file
    */
   download = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      const { id } = req.params;
+      const authReq = req as AuthenticatedRequest;
+      const { id } = authReq.params;
 
       const file = await this.assetService.downloadAsset(id);
 
@@ -190,7 +199,7 @@ export class AssetController {
       res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
       res.send(file.buffer);
 
-      logger.info(`Asset downloaded: ${id} by ${req.user?.email || 'anonymous'}`);
+      logger.info(`Asset downloaded: ${id} by ${authReq.user?.email || 'anonymous'}`);
     } catch (error) {
       next(error);
     }
@@ -201,7 +210,7 @@ export class AssetController {
    * Download asset thumbnail
    */
   downloadThumbnail = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
@@ -223,19 +232,21 @@ export class AssetController {
    * Add tags to asset
    */
   addTags = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      if (!req.user) {
+      const authReq = req as AuthenticatedRequest;
+
+      if (!authReq.user) {
         throw new UnauthorizedError('User not authenticated');
       }
 
-      const { id } = req.params;
-      const { tags } = AddTagsDto.validate(req.body);
+      const { id } = authReq.params;
+      const { tags } = AddTagsDto.validate(authReq.body);
 
-      const asset = await this.assetService.addTags(id, tags, req.user.id);
+      const asset = await this.assetService.addTags(id, tags, authReq.user.id);
 
       logger.info(`Tags added to asset ${id}: ${tags.join(', ')}`);
 
@@ -253,18 +264,20 @@ export class AssetController {
    * Remove tag from asset
    */
   removeTag = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      if (!req.user) {
+      const authReq = req as AuthenticatedRequest;
+
+      if (!authReq.user) {
         throw new UnauthorizedError('User not authenticated');
       }
 
-      const { id, tagId } = req.params;
+      const { id, tagId } = authReq.params;
 
-      const asset = await this.assetService.removeTag(id, tagId, req.user.id);
+      const asset = await this.assetService.removeTag(id, tagId, authReq.user.id);
 
       logger.info(`Tag ${tagId} removed from asset ${id}`);
 
@@ -282,25 +295,27 @@ export class AssetController {
    * Add ArCo tags to asset
    */
   addArCoTags = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      if (!req.user) {
+      const authReq = req as AuthenticatedRequest;
+
+      if (!authReq.user) {
         throw new UnauthorizedError('User not authenticated');
       }
 
-      const { id } = req.params;
-      const { arcoTags } = req.body;
+      const { id } = authReq.params;
+      const { arcoTags } = authReq.body;
 
       if (!arcoTags || !Array.isArray(arcoTags)) {
         throw new BadRequestError('arcoTags must be an array');
       }
 
-      const asset = await this.assetService.addArCoTags(id, arcoTags, req.user.id);
+      const asset = await this.assetService.addArCoTags(id, arcoTags, authReq.user.id);
 
-      logger.info(`ArCo tags added to asset ${id} by ${req.user.email}`);
+      logger.info(`ArCo tags added to asset ${id} by ${authReq.user.email}`);
 
       res.json({
         success: true,
@@ -316,21 +331,23 @@ export class AssetController {
    * Remove ArCo tag from asset
    */
   removeArCoTag = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      if (!req.user) {
+      const authReq = req as AuthenticatedRequest;
+
+      if (!authReq.user) {
         throw new UnauthorizedError('User not authenticated');
       }
 
-      const { id, arcoUri } = req.params;
+      const { id, arcoUri } = authReq.params;
 
       // Decode the URI since it will be URL-encoded
       const decodedUri = decodeURIComponent(arcoUri);
 
-      const asset = await this.assetService.removeArCoTag(id, decodedUri, req.user.id);
+      const asset = await this.assetService.removeArCoTag(id, decodedUri, authReq.user.id);
 
       logger.info(`ArCo tag ${decodedUri} removed from asset ${id}`);
 
@@ -348,7 +365,7 @@ export class AssetController {
    * Get asset statistics
    */
   getStatistics = async (
-    req: AuthenticatedRequest,
+    _req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
@@ -369,12 +386,13 @@ export class AssetController {
    * Bulk download multiple assets as ZIP
    */
   bulkDownload = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      const { assetIds, includeMetadata } = req.body;
+      const authReq = req as AuthenticatedRequest;
+      const { assetIds, includeMetadata } = authReq.body;
 
       if (!assetIds || !Array.isArray(assetIds)) {
         throw new BadRequestError('assetIds must be an array');
@@ -383,7 +401,7 @@ export class AssetController {
       const result = await this.bulkDownloadService.createBulkDownload({
         assetIds,
         includeMetadata: includeMetadata === true,
-        userId: req.user?.id,
+        userId: authReq.user?.id,
       });
 
       // Set response headers for file download
@@ -393,7 +411,7 @@ export class AssetController {
       // Stream the ZIP to response
       result.stream.pipe(res);
 
-      logger.info(`Bulk download: ${assetIds.length} assets by ${req.user?.email || 'anonymous'}`);
+      logger.info(`Bulk download: ${assetIds.length} assets by ${authReq.user?.email || 'anonymous'}`);
     } catch (error) {
       next(error);
     }

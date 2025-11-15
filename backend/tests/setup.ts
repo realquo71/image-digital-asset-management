@@ -6,6 +6,12 @@ process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-purposes-only';
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/dam_test';
 process.env.REDIS_URL = 'redis://localhost:6379/1';
+process.env.AZURE_AD_TENANT_ID = 'test-tenant-id';
+process.env.AZURE_AD_CLIENT_ID = 'test-client-id';
+process.env.AZURE_AD_CLIENT_SECRET = 'test-client-secret';
+process.env.AZURE_AD_REDIRECT_URI = 'http://localhost:3000/auth/callback';
+process.env.SHAREPOINT_SITE_URL = 'https://test.sharepoint.com';
+process.env.SHAREPOINT_LIBRARY_NAME = 'TestLibrary';
 
 // Global test timeout
 jest.setTimeout(10000);
@@ -32,6 +38,11 @@ jest.mock('@prisma/client', () => {
         count: jest.fn(),
       },
     })),
+    AssetStatus: {
+      DRAFT: 'DRAFT',
+      PUBLISHED: 'PUBLISHED',
+      ARCHIVED: 'ARCHIVED',
+    },
   };
 });
 

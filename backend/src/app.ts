@@ -11,7 +11,7 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 
 import { config } from './config';
-import { morganStream, logger } from './utils/logger';
+import { morganStream } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
 // Import routes
@@ -144,7 +144,7 @@ export const createApp = (): Application => {
   // HEALTH CHECK
   // ============================================================================
 
-  app.get('/health', (req, res) => {
+  app.get('/health', (_req, res) => {
     res.json({
       success: true,
       data: {
@@ -156,7 +156,7 @@ export const createApp = (): Application => {
     });
   });
 
-  app.get(`${config.apiPrefix}/health`, (req, res) => {
+  app.get(`${config.apiPrefix}/health`, (_req, res) => {
     res.json({
       success: true,
       data: {
@@ -175,7 +175,7 @@ export const createApp = (): Application => {
   // ============================================================================
 
   // Audit middleware - logs all state-changing operations
-  app.use(config.apiPrefix, auditMiddleware);
+  app.use(auditMiddleware);
 
   // API Routes
   app.use(`${config.apiPrefix}/auth`, authRoutes);
@@ -186,7 +186,7 @@ export const createApp = (): Application => {
   app.use(`${config.apiPrefix}/audit`, auditRoutes);
 
   // Placeholder route
-  app.get(config.apiPrefix, (req, res) => {
+  app.get(config.apiPrefix, (_req, res) => {
     res.json({
       success: true,
       message: 'Cultural Heritage DAM API',
@@ -207,3 +207,6 @@ export const createApp = (): Application => {
 
   return app;
 };
+
+// Export singleton app instance for testing
+export const app = createApp();

@@ -1,7 +1,7 @@
 // Authentication middleware
 // Verifies JWT tokens and attaches user to request
 
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors';
@@ -11,13 +11,14 @@ import { UserRole } from '@prisma/client';
 /**
  * Authenticate user by verifying JWT token
  */
-export const authenticate = async (
-  req: AuthenticatedRequest,
-  res: Response,
+export const authenticate: RequestHandler = async (
+  req: Request,
+  _res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const authHeader = req.headers.authorization;
+    const authReq = req as AuthenticatedRequest;
+    const authHeader = authReq.headers.authorization;
 
     if (!authHeader) {
       throw new UnauthorizedError('No authorization header provided');
@@ -35,7 +36,7 @@ export const authenticate = async (
     const decoded = jwt.verify(token, config.jwt.secret) as UserPayload;
 
     // Attach user to request
-    req.user = decoded;
+    authReq.user = decoded;
 
     next();
   } catch (error) {
@@ -52,18 +53,20 @@ export const authenticate = async (
 /**
  * Authorize user by checking roles
  */
-export const authorize = (...allowedRoles: UserRole[]) => {
+export const authorize = (...allowedRoles: UserRole[]): RequestHandler => {
   return (
-    req: AuthenticatedRequest,
-    res: Response,
+    req: Request,
+    _res: Response,
     next: NextFunction
   ): void => {
-    if (!req.user) {
+    const authReq = req as AuthenticatedRequest;
+
+    if (!authReq.user) {
       next(new UnauthorizedError('User not authenticated'));
       return;
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    if (!allowedRoles.includes(authReq.user.role)) {
       next(
         new ForbiddenError(
           `Access denied. Required roles: ${allowedRoles.join(', ')}`
@@ -79,13 +82,14 @@ export const authorize = (...allowedRoles: UserRole[]) => {
 /**
  * Optional authentication - doesn't fail if no token provided
  */
-export const optionalAuth = async (
-  req: AuthenticatedRequest,
-  res: Response,
+export const optionalAuth: RequestHandler = async (
+  req: Request,
+  _res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const authHeader = req.headers.authorization;
+    const authReq = req as AuthenticatedRequest;
+    const authHeader = authReq.headers.authorization;
 
     if (authHeader) {
       const parts = authHeader.split(' ');
@@ -93,7 +97,7 @@ export const optionalAuth = async (
       if (parts.length === 2 && parts[0] === 'Bearer') {
         const token = parts[1];
         const decoded = jwt.verify(token, config.jwt.secret) as UserPayload;
-        req.user = decoded;
+        authReq.user = decoded;
       }
     }
 

@@ -1,7 +1,7 @@
 // Authentication Controller
 // Handles authentication-related HTTP requests
 
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/auth.service';
 import { AzureAuthCallbackDto, RefreshTokenDto } from '../dto/auth.dto';
 import { AuthenticatedRequest } from '../types';
@@ -21,7 +21,7 @@ export class AuthController {
    * Get Azure AD authorization URL
    */
   getAzureAuthUrl = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
@@ -32,7 +32,7 @@ export class AuthController {
         throw new UnauthorizedError('redirectUri is required');
       }
 
-      const authUrl = this.authService.getAuthorizationUrl(redirectUri);
+      const authUrl = await this.authService.getAuthorizationUrl(redirectUri);
 
       res.json({
         success: true,
@@ -50,7 +50,7 @@ export class AuthController {
    * Handle Azure AD callback with authorization code
    */
   handleAzureCallback = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
@@ -78,7 +78,7 @@ export class AuthController {
    * Refresh access token
    */
   refreshToken = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
@@ -101,16 +101,18 @@ export class AuthController {
    * Get current user information
    */
   getCurrentUser = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      if (!req.user) {
+      const authReq = req as AuthenticatedRequest;
+
+      if (!authReq.user) {
         throw new UnauthorizedError('User not authenticated');
       }
 
-      const user = await this.authService.getCurrentUser(req.user.id);
+      const user = await this.authService.getCurrentUser(authReq.user.id);
 
       if (!user) {
         throw new UnauthorizedError('User not found');
@@ -130,13 +132,15 @@ export class AuthController {
    * Logout user (client-side token removal)
    */
   logout = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      if (req.user) {
-        logger.info(`User logged out: ${req.user.email}`);
+      const authReq = req as AuthenticatedRequest;
+
+      if (authReq.user) {
+        logger.info(`User logged out: ${authReq.user.email}`);
       }
 
       res.json({

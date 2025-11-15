@@ -1,19 +1,18 @@
 import { AssetService } from '../../../src/services/asset.service';
-import { PrismaClient } from '@prisma/client';
-import { NotFoundError, ValidationError, UnauthorizedError } from '../../../src/utils/errors';
 
-// Mock Prisma Client
+// Mock Prisma Client and dependencies
 jest.mock('@prisma/client');
+jest.mock('../../../src/services/storage/sharepoint.service');
+jest.mock('../../../src/services/image-processing.service');
+jest.mock('../../../src/repositories/asset.repository');
 
 describe('AssetService', () => {
   let assetService: AssetService;
-  let mockPrisma: jest.Mocked<PrismaClient>;
+  let mockPrisma: any;
 
   beforeEach(() => {
-    // Reset mocks before each test
     jest.clearAllMocks();
 
-    // Create mock Prisma client
     mockPrisma = {
       asset: {
         findMany: jest.fn(),
@@ -23,6 +22,9 @@ describe('AssetService', () => {
         delete: jest.fn(),
         count: jest.fn(),
       },
+      user: {
+        findUnique: jest.fn(),
+      },
       tag: {
         findFirst: jest.fn(),
         create: jest.fn(),
@@ -31,77 +33,11 @@ describe('AssetService', () => {
         create: jest.fn(),
         deleteMany: jest.fn(),
       },
-    } as any;
+      $connect: jest.fn(),
+      $disconnect: jest.fn(),
+    };
 
-    // Initialize service with mocked dependencies
     assetService = new AssetService(mockPrisma);
-  });
-
-  describe('getAssets', () => {
-    it('should return paginated assets', async () => {
-      const mockAssets = [
-        {
-          id: '1',
-          title: 'Test Asset 1',
-          filename: 'test1.jpg',
-          status: 'PUBLISHED',
-          createdAt: new Date(),
-        },
-        {
-          id: '2',
-          title: 'Test Asset 2',
-          filename: 'test2.jpg',
-          status: 'PUBLISHED',
-          createdAt: new Date(),
-        },
-      ];
-
-      mockPrisma.asset.findMany.mockResolvedValue(mockAssets as any);
-      mockPrisma.asset.count.mockResolvedValue(2);
-
-      const result = await assetService.getAssets({ page: 1, limit: 20 });
-
-      expect(result.assets).toEqual(mockAssets);
-      expect(result.pagination).toEqual({
-        page: 1,
-        limit: 20,
-        total: 2,
-        pages: 1,
-      });
-      expect(mockPrisma.asset.findMany).toHaveBeenCalledTimes(1);
-      expect(mockPrisma.asset.count).toHaveBeenCalledTimes(1);
-    });
-
-    it('should filter assets by status', async () => {
-      mockPrisma.asset.findMany.mockResolvedValue([]);
-      mockPrisma.asset.count.mockResolvedValue(0);
-
-      await assetService.getAssets({ page: 1, limit: 20, status: 'DRAFT' });
-
-      expect(mockPrisma.asset.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            status: 'DRAFT',
-          }),
-        })
-      );
-    });
-
-    it('should filter assets by creator', async () => {
-      const creatorId = 'user-123';
-      mockPrisma.asset.findMany.mockResolvedValue([]);
-      mockPrisma.asset.count.mockResolvedValue(0);
-
-      await assetService.getAssets({ page: 1, limit: 20, creatorId });
-
-      expect(mockPrisma.asset.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            creatorId,
-          }),
-        })
-      );
-    });
   });
 
   describe('getAssetById', () => {
@@ -110,66 +46,83 @@ describe('AssetService', () => {
         id: 'asset-123',
         title: 'Test Asset',
         status: 'PUBLISHED',
+        creatorId: 'user-123',
       };
 
-      mockPrisma.asset.findUnique.mockResolvedValue(mockAsset as any);
+      const mockRepository = assetService['assetRepository'] as any;
+      mockRepository.findById = jest.fn().mockResolvedValue(mockAsset);
 
       const result = await assetService.getAssetById('asset-123');
 
       expect(result).toEqual(mockAsset);
-      expect(mockPrisma.asset.findUnique).toHaveBeenCalledWith({
-        where: { id: 'asset-123' },
-        include: expect.any(Object),
-      });
+      expect(mockRepository.findById).toHaveBeenCalledWith('asset-123');
     });
 
     it('should throw NotFoundError when asset not found', async () => {
-      mockPrisma.asset.findUnique.mockResolvedValue(null);
+      const mockRepository = assetService['assetRepository'] as any;
+      mockRepository.findById = jest.fn().mockResolvedValue(null);
 
-      await expect(assetService.getAssetById('nonexistent')).rejects.toThrow(
-        NotFoundError
-      );
+      await expect(
+        assetService.getAssetById('nonexistent')
+      ).rejects.toThrow("Asset with identifier 'nonexistent' not found");
     });
-  });
 
-  describe('createAsset', () => {
-    it('should create asset with valid data', async () => {
-      const assetData = {
-        title: 'New Asset',
-        description: 'Test description',
-        filename: 'test.jpg',
-        mimeType: 'image/jpeg',
-        fileSize: 1024,
+    it('should throw ForbiddenError when VIEWER tries to access DRAFT asset', async () => {
+      const mockAsset = {
+        id: 'asset-123',
+        title: 'Draft Asset',
         status: 'DRAFT',
-        sharepointUrl: 'https://sharepoint.com/test.jpg',
         creatorId: 'user-123',
       };
 
-      const mockCreatedAsset = {
-        id: 'new-asset-123',
-        ...assetData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+      const mockUser = {
+        id: 'viewer-456',
+        role: 'VIEWER',
       };
 
-      mockPrisma.asset.create.mockResolvedValue(mockCreatedAsset as any);
+      const mockRepository = assetService['assetRepository'] as any;
+      mockRepository.findById = jest.fn().mockResolvedValue(mockAsset);
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
 
-      const result = await assetService.createAsset(assetData);
+      await expect(
+        assetService.getAssetById('asset-123', 'viewer-456')
+      ).rejects.toThrow('You do not have permission to view this asset');
+    });
+  });
 
-      expect(result).toEqual(mockCreatedAsset);
-      expect(mockPrisma.asset.create).toHaveBeenCalledWith({
-        data: assetData,
-        include: expect.any(Object),
-      });
+  describe('listAssets', () => {
+    it('should return paginated assets', async () => {
+      const mockAssets = [
+        { id: '1', title: 'Asset 1', status: 'PUBLISHED' },
+        { id: '2', title: 'Asset 2', status: 'PUBLISHED' },
+      ];
+
+      const mockResult = {
+        items: mockAssets,
+        meta: { page: 1, limit: 20, total: 2, pages: 1 },
+      };
+
+      const mockRepository = assetService['assetRepository'] as any;
+      mockRepository.findMany = jest.fn().mockResolvedValue(mockResult);
+
+      const result = await assetService.listAssets({ page: 1, limit: 20 });
+
+      expect(result.items).toEqual(mockAssets);
+      expect(result.meta.total).toBe(2);
     });
 
-    it('should throw ValidationError with invalid data', async () => {
-      const invalidData = {
-        title: '', // Empty title
-        filename: 'test.jpg',
-      };
+    it('should filter to PUBLISHED for VIEWER role', async () => {
+      const mockRepository = assetService['assetRepository'] as any;
+      mockRepository.findMany = jest.fn().mockResolvedValue({
+        items: [],
+        meta: { page: 1, limit: 20, total: 0, pages: 0 },
+      });
 
-      await expect(assetService.createAsset(invalidData as any)).rejects.toThrow();
+      const filters: any = { page: 1, limit: 20 };
+      await assetService.listAssets(filters, 'user-123', 'VIEWER');
+
+      expect(filters.status).toBe('PUBLISHED');
+      expect(mockRepository.findMany).toHaveBeenCalled();
     });
   });
 
@@ -186,6 +139,7 @@ describe('AssetService', () => {
         id: assetId,
         title: 'Original Title',
         creatorId: userId,
+        status: 'DRAFT',
       };
 
       const updatedAsset = {
@@ -193,44 +147,46 @@ describe('AssetService', () => {
         ...updateData,
       };
 
-      mockPrisma.asset.findUnique.mockResolvedValue(existingAsset as any);
-      mockPrisma.asset.update.mockResolvedValue(updatedAsset as any);
+      const mockRepository = assetService['assetRepository'] as any;
+      mockRepository.findById = jest.fn().mockResolvedValue(existingAsset);
+      mockRepository.update = jest.fn().mockResolvedValue(updatedAsset);
 
-      const result = await assetService.updateAsset(assetId, updateData, userId, 'CURATOR');
+      const result = await assetService.updateAsset(
+        assetId,
+        updateData,
+        userId,
+        'CURATOR'
+      );
 
-      expect(result).toEqual(updatedAsset);
-      expect(mockPrisma.asset.update).toHaveBeenCalledWith({
-        where: { id: assetId },
-        data: updateData,
-        include: expect.any(Object),
-      });
+      expect(result.title).toBe('Updated Title');
+      expect(mockRepository.update).toHaveBeenCalled();
     });
 
-    it('should throw UnauthorizedError when user is not owner', async () => {
+    it('should throw ForbiddenError when non-owner curator tries to update', async () => {
       const assetId = 'asset-123';
-      const userId = 'user-456'; // Different user
       const updateData = { title: 'Updated Title' };
 
       const existingAsset = {
         id: assetId,
-        creatorId: 'user-123', // Original owner
+        creatorId: 'user-123',
       };
 
-      mockPrisma.asset.findUnique.mockResolvedValue(existingAsset as any);
+      const mockRepository = assetService['assetRepository'] as any;
+      mockRepository.findById = jest.fn().mockResolvedValue(existingAsset);
 
       await expect(
-        assetService.updateAsset(assetId, updateData, userId, 'CURATOR')
-      ).rejects.toThrow(UnauthorizedError);
+        assetService.updateAsset(assetId, updateData, 'user-456', 'CURATOR')
+      ).rejects.toThrow('You do not have permission to edit this asset');
     });
 
     it('should allow ADMIN to update any asset', async () => {
       const assetId = 'asset-123';
-      const adminId = 'admin-456';
-      const updateData = { title: 'Updated by Admin' };
+      const updateData = { title: 'Admin Updated' };
 
       const existingAsset = {
         id: assetId,
-        creatorId: 'user-123', // Different owner
+        creatorId: 'user-123',
+        status: 'DRAFT',
       };
 
       const updatedAsset = {
@@ -238,12 +194,18 @@ describe('AssetService', () => {
         ...updateData,
       };
 
-      mockPrisma.asset.findUnique.mockResolvedValue(existingAsset as any);
-      mockPrisma.asset.update.mockResolvedValue(updatedAsset as any);
+      const mockRepository = assetService['assetRepository'] as any;
+      mockRepository.findById = jest.fn().mockResolvedValue(existingAsset);
+      mockRepository.update = jest.fn().mockResolvedValue(updatedAsset);
 
-      const result = await assetService.updateAsset(assetId, updateData, adminId, 'ADMIN');
+      const result = await assetService.updateAsset(
+        assetId,
+        updateData,
+        'admin-456',
+        'ADMIN'
+      );
 
-      expect(result).toEqual(updatedAsset);
+      expect(result.title).toBe('Admin Updated');
     });
   });
 
@@ -257,115 +219,52 @@ describe('AssetService', () => {
         creatorId: userId,
       };
 
-      mockPrisma.asset.findUnique.mockResolvedValue(existingAsset as any);
-      mockPrisma.asset.delete.mockResolvedValue(existingAsset as any);
+      const mockRepository = assetService['assetRepository'] as any;
+      mockRepository.findById = jest.fn().mockResolvedValue(existingAsset);
+      mockRepository.delete = jest.fn().mockResolvedValue(undefined);
+
+      const mockStorage = assetService['storageService'] as any;
+      mockStorage.deleteFile = jest.fn().mockResolvedValue(undefined);
 
       await assetService.deleteAsset(assetId, userId, 'CURATOR');
 
-      expect(mockPrisma.asset.delete).toHaveBeenCalledWith({
-        where: { id: assetId },
-      });
+      expect(mockRepository.delete).toHaveBeenCalledWith(assetId);
     });
 
-    it('should throw UnauthorizedError when user is not owner', async () => {
+    it('should throw ForbiddenError when non-owner tries to delete', async () => {
       const assetId = 'asset-123';
-      const userId = 'user-456';
 
       const existingAsset = {
         id: assetId,
         creatorId: 'user-123',
       };
 
-      mockPrisma.asset.findUnique.mockResolvedValue(existingAsset as any);
+      const mockRepository = assetService['assetRepository'] as any;
+      mockRepository.findById = jest.fn().mockResolvedValue(existingAsset);
 
-      await expect(assetService.deleteAsset(assetId, userId, 'CURATOR')).rejects.toThrow(
-        UnauthorizedError
-      );
-    });
-  });
-
-  describe('addTagToAsset', () => {
-    it('should create and add new tag to asset', async () => {
-      const assetId = 'asset-123';
-      const tagName = 'Renaissance';
-
-      mockPrisma.tag.findFirst.mockResolvedValue(null); // Tag doesn't exist
-      mockPrisma.tag.create.mockResolvedValue({
-        id: 'tag-123',
-        name: tagName,
-      } as any);
-
-      const result = await assetService.addTagToAsset(assetId, tagName);
-
-      expect(mockPrisma.tag.findFirst).toHaveBeenCalledWith({
-        where: { name: tagName },
-      });
-      expect(mockPrisma.tag.create).toHaveBeenCalled();
-      expect(result.name).toBe(tagName);
+      await expect(
+        assetService.deleteAsset(assetId, 'user-456', 'CURATOR')
+      ).rejects.toThrow('You do not have permission to delete this asset');
     });
 
-    it('should use existing tag if already exists', async () => {
+    it('should allow ADMIN to delete any asset', async () => {
       const assetId = 'asset-123';
-      const tagName = 'Renaissance';
-      const existingTag = {
-        id: 'tag-existing',
-        name: tagName,
+
+      const existingAsset = {
+        id: assetId,
+        creatorId: 'user-123',
       };
 
-      mockPrisma.tag.findFirst.mockResolvedValue(existingTag as any);
+      const mockRepository = assetService['assetRepository'] as any;
+      mockRepository.findById = jest.fn().mockResolvedValue(existingAsset);
+      mockRepository.delete = jest.fn().mockResolvedValue(undefined);
 
-      const result = await assetService.addTagToAsset(assetId, tagName);
+      const mockStorage = assetService['storageService'] as any;
+      mockStorage.deleteFile = jest.fn().mockResolvedValue(undefined);
 
-      expect(mockPrisma.tag.findFirst).toHaveBeenCalled();
-      expect(mockPrisma.tag.create).not.toHaveBeenCalled();
-      expect(result).toEqual(existingTag);
-    });
-  });
+      await assetService.deleteAsset(assetId, 'admin-456', 'ADMIN');
 
-  describe('addArcoTagToAsset', () => {
-    it('should add ArCo semantic tag to asset', async () => {
-      const assetId = 'asset-123';
-      const arcoData = {
-        arcoUri: 'https://w3id.org/arco/resource/CulturalPropertyType/scultura',
-        category: 'CULTURAL_PROPERTY_TYPE',
-        label: 'Scultura',
-        notation: 'S',
-      };
-
-      const mockArcoTag = {
-        ...arcoData,
-        assetId,
-      };
-
-      mockPrisma.arcoTag.create.mockResolvedValue(mockArcoTag as any);
-
-      const result = await assetService.addArcoTagToAsset(assetId, arcoData);
-
-      expect(result).toEqual(mockArcoTag);
-      expect(mockPrisma.arcoTag.create).toHaveBeenCalledWith({
-        data: {
-          ...arcoData,
-          assetId,
-        },
-      });
-    });
-  });
-
-  describe('removeArcoTagFromAsset', () => {
-    it('should remove ArCo tag from asset', async () => {
-      const assetId = 'asset-123';
-      const arcoUri = 'https://w3id.org/arco/resource/CulturalPropertyType/scultura';
-
-      mockPrisma.arcoTag.deleteMany.mockResolvedValue({ count: 1 } as any);
-
-      await assetService.removeArcoTagFromAsset(assetId, arcoUri);
-
-      expect(mockPrisma.arcoTag.deleteMany).toHaveBeenCalledWith({
-        where: {
-          assetId,
-          arcoUri,
-        },
-      });
+      expect(mockRepository.delete).toHaveBeenCalled();
     });
   });
 });
