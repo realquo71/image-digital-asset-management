@@ -142,6 +142,11 @@ export interface AppConfig {
     url: string;
     password?: string;
   };
+  elasticsearch: {
+    node: string;
+    username?: string;
+    password?: string;
+  };
   azure: {
     tenantId: string;
     clientId: string;

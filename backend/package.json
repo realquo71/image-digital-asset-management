@@ -48,7 +48,8 @@
     "sparql-http-client": "^2.4.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "xmlbuilder2": "^4.0.0"
   },
   "devDependencies": {
     "@types/archiver": "^6.0.2",

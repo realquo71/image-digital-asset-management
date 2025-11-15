@@ -39,6 +39,12 @@ export const config: AppConfig = {
     password: getEnvVarOptional('REDIS_PASSWORD'),
   },
 
+  elasticsearch: {
+    node: getEnvVar('ELASTICSEARCH_URL', 'http://localhost:9200'),
+    username: getEnvVarOptional('ELASTICSEARCH_USERNAME'),
+    password: getEnvVarOptional('ELASTICSEARCH_PASSWORD'),
+  },
+
   azure: {
     tenantId: getEnvVar('AZURE_AD_TENANT_ID'),
     clientId: getEnvVar('AZURE_AD_CLIENT_ID'),
